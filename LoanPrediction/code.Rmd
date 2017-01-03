@@ -16,6 +16,7 @@ library(caret)
 library(rpart)
 library(rpart.plot)
 library(randomForest)
+set.seed(121)
 ```
 ##Loading and exploring data
 ```{r}
@@ -89,6 +90,7 @@ dataNorm$Loan_ID = NULL
 ##Creating training and testing dataset
 We will use package caTools to split the data into training and testing dataset.70% of original dataset will be training dataset and 30% will be testing.
 ```{r}
+set.seed(121)
 split = sample.split(dataNorm$Loan_Status,SplitRatio = 0.70)
 train = subset(dataNorm,split==T)
 test =  subset(dataNorm,split==F)
@@ -105,11 +107,12 @@ table(test$Loan_Status,logpreds>0.55)
 ```
 We get an accuracy of
 ```{r}
-((32+124)/nrow(test))*100
+((19+125)/nrow(test))*100
 ```
 
 ###2.Decision Trees
 ```{r}
+set.seed(121)
 tree = rpart(Loan_Status ~ .,data = train,method = "class")
 prp(tree)
 treepreds = predict(tree,newdata = test , type = "class")
@@ -120,7 +123,7 @@ table(test$Loan_Status,treepreds)
 ```
 Accuracy of our model is given by :- 
 ```{r}
-((33+120)/nrow(test))*100
+((27+115)/nrow(test))*100
 ```
 
 ###3. Random Forest
@@ -137,6 +140,6 @@ table(test$Loan_Status,RFpreds)
 ```
 Accuracy of our model is given by :- 
 ```{r}
-((34+124)/nrow(test))*100
+((26+114)/nrow(test))*100
 ```
-Out of all 3 models,Random Forest gives us best accuracy.
+Out of all 3 models,Logistic Model gives us best accuracy.
