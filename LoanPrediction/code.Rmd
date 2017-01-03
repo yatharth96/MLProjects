@@ -1,0 +1,142 @@
+---
+title: "LoanPrediction"
+author: "Yatharth Malik"
+date: "January 3, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,message=F,warning=F}
+library(mlr)
+library(caTools)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+##Loading and exploring data
+```{r}
+loandata = read.csv("train.csv",na.strings = c(""," ",NA))
+summarizeColumns(loandata)
+
+hist(loandata$ApplicantIncome,breaks = 200)
+hist(loandata$CoapplicantIncome,breaks = 200)
+hist(loandata$LoanAmount,breaks = 200)
+```
+
+By looking at above plots, we find out that ApplicantIncome and CoapplicantIncome are highly skewed and hence we have to normalize them.
+```{r}
+boxplot(loandata$ApplicantIncome)
+boxplot(loandata$CoapplicantIncome)
+boxplot(loandata$LoanAmount)
+```
+
+All these variables have outliers which need to be deal seperately.
+
+Also we need to change Credit_History to factor and "3+" level to "3" in Dependents variable.
+```{r}
+loandata$Credit_History = as.factor(loandata$Credit_History)
+levels(loandata$Dependents)[4]  =  "3"
+
+```
+
+## Missing Value Imputation
+There are missing values in our dataset.So,we'll have to deal with them first.
+We will replace the numeric missing values with the mean of that variable(Mean Imputation) and factor missing values with mode of that variable(Mode Imputation).
+For missing value imputation, we will use "impute" function from the package "mlr"
+```{r}
+imp = impute(loandata,classes = list(factor = imputeMode(),integer = imputeMean()))
+completedata = imp$data
+```
+
+## Removing Outlier
+To remove outliers we will use "capLargeValues" function from package "mlr".
+```{r}
+cd = capLargeValues(completedata,target = "Loan_Status",cols = c("ApplicantIncome"),threshold = 40000)
+cd = capLargeValues(cd,target = "Loan_Status",cols = c("CoapplicantIncome"),threshold = 21000)
+cd = capLargeValues(cd,target = "Loan_Status",cols =c("LoanAmount"),threshold = 520)
+cappedData = cd
+```
+## Creating new variables
+```{r}
+cappedData$TotalIncome = cappedData$ApplicantIncome + cappedData$CoapplicantIncome
+cappedData$IncomeLoan = cappedData$TotalIncome/cappedData$LoanAmount
+```
+## Normalizing data
+To normalize our dataset,we will use "preProcess" function from package "caret"
+```{r}
+preproc = preProcess(cappedData)
+dataNorm = predict(preproc,cappedData)
+```
+## Correlation
+Variables which are highly correlated do not contribute to accuracy of the model.Hence one of the two highly correlated variables can be ignored safely.
+To check the correlation of different numeric variables
+```{r}
+az = split(names(dataNorm),sapply(dataNorm,function(x){class(x)}))
+xs = dataNorm[az$numeric]
+cor(xs)
+
+```
+Since ApplicantIncome and  TotalIncome are highly correlated,we will ignore TotalIncome variable.
+```{r}
+dataNorm$TotalIncome = NULL
+dataNorm$Loan_ID = NULL
+```
+
+##Creating training and testing dataset
+We will use package caTools to split the data into training and testing dataset.70% of original dataset will be training dataset and 30% will be testing.
+```{r}
+split = sample.split(dataNorm$Loan_Status,SplitRatio = 0.70)
+train = subset(dataNorm,split==T)
+test =  subset(dataNorm,split==F)
+```
+## Predictive Models
+### 1. Logistic Regression
+```{r}
+logmodel = glm(Loan_Status ~ . ,data = train,family = "binomial")
+logpreds = predict(logmodel,newdata = test, type = "response")
+```
+To create confusion matrix
+```{r}
+table(test$Loan_Status,logpreds>0.55)
+```
+We get an accuracy of
+```{r}
+((32+124)/nrow(test))*100
+```
+
+###2.Decision Trees
+```{r}
+tree = rpart(Loan_Status ~ .,data = train,method = "class")
+prp(tree)
+treepreds = predict(tree,newdata = test , type = "class")
+```
+Confusion Matrix
+```{r}
+table(test$Loan_Status,treepreds)
+```
+Accuracy of our model is given by :- 
+```{r}
+((33+120)/nrow(test))*100
+```
+
+###3. Random Forest
+```{r}
+set.seed(121)
+RF = randomForest(Loan_Status ~ . ,data =train,importance= T)
+varImpPlot(RF)
+RFpreds = predict(RF,newdata = test,type = "class")
+
+```
+Confusion Matrix
+```{r}
+table(test$Loan_Status,RFpreds)
+```
+Accuracy of our model is given by :- 
+```{r}
+((34+124)/nrow(test))*100
+```
+Out of all 3 models,Random Forest gives us best accuracy.
