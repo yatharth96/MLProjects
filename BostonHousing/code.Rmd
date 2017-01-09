@@ -1,0 +1,84 @@
+---
+title: "HousingData"
+author: "Yatharth Malik"
+date: "January 10, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Loading libraries
+```{r,message=F}
+library(caTools)
+library(randomForest)
+```
+
+##Loading data
+```{r}
+housing = read.table("http://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.data")
+
+names = c("CRIM","ZN","INDUS","CHAS","NOX","RM","AGE","DIS","RAD","TAX","PTRATIO","B","LSTAT","MEDV")
+
+names(housing)  =  names
+
+housing$CHAS = as.factor(housing$CHAS)
+```
+
+##Creating testing and training set
+```{r}
+set.seed(121)
+split = sample.split(housing$MEDV,SplitRatio = 0.70)
+train = subset(housing,split==T)
+test = subset(housing,split==F)
+
+```
+
+##Checking for multicollinearity
+```{r}
+cor(housing[,-4])
+```
+Since RAD and TAX are highly correlated, we will consider only one of them for building our model.
+
+##Linear Regression
+```{r}
+fit.linear = lm(MEDV ~ . -RAD -TAX - AGE -CRIM - INDUS,data = train)
+summary(fit.linear)
+par(mfrow = c(2,2))
+plot(fit.linear)
+preds = predict(fit.linear,newdata = test)
+```
+Calculation of error
+```{r}
+RMSE=sqrt(mean((test$MEDV-preds)^2))
+RMSE
+```
+
+##Logistic Regression
+```{r}
+fit.log = glm(MEDV ~ . -RAD -TAX - AGE -CRIM - INDUS,data = train)
+summary(fit.log)
+preds.log = predict(fit.log,newdata = test)
+
+```
+Calculation of error
+```{r}
+RMSE = sqrt(mean((test$MEDV-preds.log)^2))
+RMSE
+
+```
+##Random Forest
+```{r}
+trees = 500
+fit.RF = randomForest(MEDV ~ .,data = train,ntree = trees,importance = T)
+varImpPlot(fit.RF)
+preds.RF = predict(fit.RF,newdata = test)
+
+```
+Calculation of error
+```{r}
+RMSE=sqrt(mean((test$MEDV-preds.RF)^2))
+RMSE
+
+```
