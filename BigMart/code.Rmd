@@ -1,0 +1,157 @@
+---
+title: "Bigmart Sales"
+author: "Yatharth Malik"
+date: "January 31, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r,message=F,warning=F}
+library(caret)
+library(plyr)
+library(dplyr)
+library(dummies)
+library(mlr)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(e1071)
+library(Metrics)
+library(randomForest)
+```
+
+## Loading data and exploration
+```{r}
+train = read.csv("train.csv",na.strings = c(""," ",NA,"NA"))
+test = read.csv("test.csv",na.strings = c(""," ",NA,"NA"))
+
+summary(train)
+str(train)
+summary(test)
+str(test)
+```
+
+
+Infrences drawn from data exploration :-
+
+1. Factor mismatch in Item_Fat_Content.
+
+2. Missing values in  Item_Weight and Outlet_Size.
+
+3. Minimum value of Item_Visibility is 0,which is not practically possible.Hence,we'll deal them as missing values.
+
+## Univariate Analysis
+```{r}
+boxplot(train$Item_MRP,main = "Boxplot of Item MRP")
+boxplot(train$Item_Weight,main = "Boxplot of Item Weight")
+boxplot(train$Item_Visibility,main = "Boxplot of Item Visibility")
+```
+
+## Bivariate Analysis
+```{r}
+ggplot(train,aes(x=Item_Visibility,y=Item_Outlet_Sales)) + geom_point(color = "red") + ggtitle("Item Visibility vs Item Outlet Sales")
+
+ggplot(train,aes(x=Outlet_Identifier,y= Item_Outlet_Sales)) + geom_bar(stat="identity",color = "blue") + ggtitle("Outlet vs Outlet Sales") + theme(axis.text.x = element_text(angle = 70,vjust = 0.5,color = "blue"))
+
+ggplot(train,aes(x=Item_Type,y= Item_Outlet_Sales)) + geom_bar(stat="identity",color = "purple") + ggtitle("Item Type vs Item Sales") + theme(axis.text.x = element_text(angle = 70,vjust = 0.5,color = "black"))
+
+
+```
+## Dealing with categorical and continuous variables
+
+We will use median imputation to deal with continuous missing values
+```{r}
+test$Item_Outlet_Sales = 1
+comb = rbind(train,test)
+
+comb$Item_Weight[is.na(comb$Item_Weight)] = median(comb$Item_Weight,na.rm = T)
+
+comb$Item_Visibility = ifelse(comb$Item_Visibility==0,median(comb$Item_Visibility),comb$Item_Visibility)
+
+comb$Outlet_Size = ifelse(is.na(comb$Outlet_Size),"Others",comb$Outlet_Size)
+comb$Outlet_Size = as.factor(comb$Outlet_Size)
+levels(comb$Outlet_Size)[1] = "High"
+levels(comb$Outlet_Size)[2] = "Medium"
+levels(comb$Outlet_Size)[3] = "Low"
+
+table(comb$Item_Fat_Content)
+
+comb$Item_Fat_Content = revalue(comb$Item_Fat_Content,c("LF" = "Low Fat","reg"="Regular"))
+comb$Item_Fat_Content = revalue(comb$Item_Fat_Content,c("low fat"="Low Fat"))
+
+table(comb$Item_Fat_Content)
+
+
+```
+
+## Feature Engineering
+```{r}
+temp = comb%>%group_by(Outlet_Identifier)%>%tally()
+names(temp)[2]  = "Outlet_Count"
+comb = full_join(comb,temp,by = "Outlet_Identifier")
+
+temp1 = comb%>%group_by(Item_Identifier)%>%tally()
+names(temp1)[2]  =  "Item_Count"
+comb = merge(comb,temp1,by = "Item_Identifier")
+
+temp2 = comb%>%select(Outlet_Establishment_Year)%>%mutate(Outlet_Year = 2013 - comb$Outlet_Establishment_Year)
+temp2$Outlet_Establishment_Year = NULL
+comb = cbind(comb,temp2 )
+
+
+items = substr(comb$Item_Identifier,1,2)
+items = gsub("FD","Food",items)
+items = gsub("DR","Drinks",items)
+items = gsub("NC","Non Consumable",items)
+comb$Item_Type_New = factor(items)
+
+str(comb)
+```
+
+## One Hot Encoding
+```{r}
+comb = dummy.data.frame(comb,names = c("Outlet_Size","Outlet_Location_Type","Outlet_Type","Item_Type_New","Item_Fat_Content"),sep='_')
+str(comb)
+```
+
+## Predictive Modelling
+
+```{r}
+comb = select(comb,-c(Item_Identifier,Outlet_Identifier,Item_Type,Outlet_Establishment_Year))
+
+new_train = comb[1:nrow(train),]
+new_test = comb[-(1:nrow(train)),]
+names(new_train) = make.names(names(new_train))
+names(new_test) = make.names(names(new_test))
+```
+### 1. Linear Regression
+```{r}
+linear_model = lm(Item_Outlet_Sales ~ . ,data = new_train)
+summary(linear_model)
+pred_lm = predict(linear_model,type = "response")
+rmse(new_train$Item_Outlet_Sales,pred_lm)
+```
+
+### 2. Decision Trees
+```{r}
+tree_model = rpart(Item_Outlet_Sales ~ . ,data = new_test)
+summary(tree_model)
+prp(tree_model)
+
+pred_tree = predict(tree_model,type= "vector")
+rmse(new_train$Item_Outlet_Sales,pred_tree)
+```
+
+### 3. Random Forest
+```{r}
+rf_model = randomForest(Item_Outlet_Sales ~ . ,data = new_train,mtry = 2 ,ntree = 1000)
+summary(rf_model)
+varImpPlot(rf_model)
+pred_rf = predict(rf_model,type="response")
+rmse(new_train$Item_Outlet_Sales,pred_rf)
+
+```
