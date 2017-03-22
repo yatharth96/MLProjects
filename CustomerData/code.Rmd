@@ -1,0 +1,53 @@
+library(ggplot2)
+data = read.csv("Wholesale customers data.csv")
+summary(wholesale)
+
+## Data preprocessing
+top.n.custs <- function (data,cols,n=5) 
+{
+    idx.to.remove <-integer(0) 
+    for (c in cols)
+    { 
+        col.order <-order(data[,c],decreasing=T) #
+        idx <-head(col.order, n) #
+        idx.to.remove <-union(idx.to.remove,idx)
+    }
+    return(idx.to.remove) 
+}
+top.custs <-top.n.custs(data,cols=3:8,n=5)
+length(top.custs) 
+data[top.custs,]
+data.rm.top<-data[-c(top.custs),] 
+
+
+## finding approporiate k
+rng<-2:20 
+tries <-100 
+avg.totw.ss <-integer(length(rng))
+for(v in rng)
+{
+    v.totw.ss <-integer(tries) 
+    for(i in 1:tries)
+    {
+        k.temp <-kmeans(data.rm.top,centers=v) 
+        v.totw.ss[i] <-k.temp$tot.withinss    
+    }
+    avg.totw.ss[v-1] <-mean(v.totw.ss) 
+}
+
+df = data.frame(x = rng,y = avg.totw.ss)
+ggplot(df,aes(x = x,y = y)) + geom_line() + xlab("Value of k") + ylab("Average Total Within Sum of Squares") + ggtitle("Total Within SS by Various K")
+
+# By observing the above plot, we choose the optimal value of k = 5
+set.seed(76964057)
+km = kmeans(data.rm.top[-c(1,2)],centers = 5)
+
+km$centers
+clusters = as.factor(km$cluster)
+
+# Plots
+ggplot(data.rm.top,aes(x= Fresh,y = Grocery,color = clusters)) + geom_point() + ggtitle("Grocery vs Fresh")
+
+ggplot(data.rm.top,aes(x= Fresh,y = Detergents_Paper,color = clusters)) + geom_point() + ggtitle("Detergents_Paper vs Fresh")
+
+
