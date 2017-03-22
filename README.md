@@ -1,5 +1,5 @@
 # MLProjects
-Contains solution to various problems solved using Data Preprocessing techniques and Machine Learning algorithms.
+Contains solution to various problems solved using Data Preprocessing techniques and Machine Learning algorithms in R
 
 All the problems are either taken from [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/index.html) , [Kaggle](https://www.kaggle.com/) or [Analytics Vidhya](https://datahack.analyticsvidhya.com/contest/all/)
 
