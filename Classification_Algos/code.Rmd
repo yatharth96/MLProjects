@@ -1,0 +1,243 @@
+---
+title: "Assignment"
+author: "Yatharth Malik"
+date: "March 27, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Comparing classification techniques on iris dataset
+
+Many classification techniques are applied on iris dataset to compare the performance of each algorithm on testing dataset. Training dataset contains 100 rows which is used to train the model. Testing dataset contains 50 rows which is used to calculate the performance of the model on unseen dataset.
+
+## Loading dataset and libraries
+```{r,warning=FALSE,message=FALSE}
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(gmodels)
+library(e1071)
+library(gridExtra)
+library(randomForest)
+data(iris)
+summary(iris)
+```
+
+## Data Pre-processing
+
+We will normalize the continuous variables before performing any analysis on the dataset
+```{r}
+
+temp = as.data.frame(scale(iris[,1:4]))
+temp$Species = iris$Species
+summary(temp)
+
+```
+
+
+## Exploratory data analysis
+
+We will look at couple of plots, to capture the dependence of variables with each other.
+
+```{r}
+g1 = ggplot(temp,aes(x =Sepal.Length,y = Sepal.Width,color = Species)) + geom_point() + ggtitle("Sepal.Width vs Sepal.Length")
+
+g2 = ggplot(temp,aes(x =Petal.Length,y = Petal.Width,color = Species)) + geom_point() + ggtitle("Petal.Width vs Petal.Length")
+
+g3 = ggplot(temp,aes(x =Petal.Length,y = Sepal.Length,color = Species)) + geom_point() + ggtitle("Sepal.Length vs Petal.Length")
+
+g4 = ggplot(temp,aes(x =Petal.Width,y = Sepal.Width,color = Species)) + geom_point()  + ggtitle("Sepal.Width vs Petal.Width")
+
+grid.arrange(g1,g2,g3,g4,nrow = 2)
+```
+
+## Creating training and testing dataset
+```{r}
+smp_size =  100
+set.seed(123)
+train_ind = sample(seq_len(nrow(temp)), size = smp_size)
+train = temp[train_ind, ]
+test = temp[-train_ind, ]
+
+```
+
+Number of rows in "train"
+```{r}
+nrow(train)
+```
+
+Number of rows in "test"
+```{r}
+nrow(test)
+```
+
+Species distribution in "train"
+```{r}
+table(train$Species)
+```
+
+Species distribution in "test"
+```{r}
+table(test$Species)
+```
+
+## Classification Techniques
+
+### 1. Decision Trees
+```{r}
+model.rpart = rpart(Species ~ . ,data =train)
+preds.rpart = predict(model.rpart,newdata = test,type = "class")
+CrossTable(test$Species,preds.rpart,chisq = F,prop.r = F,prop.c = F,prop.t = F,prop.chisq = F)
+```
+
+Accuracy of Decision trees
+```{r}
+((14+16+16)/nrow(test))*100
+```
+
+#### Explaination
+
+Decision trees are supervised classification algorithm useful when input variables interact with the output in “if-then” kinds of ways. They are also suitable when inputs have an AND relationship to each other or when input variables are redundant or correlated.
+
+By observing the plots from "Exploratory Data Analysis", we can clearly see a positive relationship/correlation between the variables of Iris dataset. Thus making decision trees ideal for the classification of the species. Also the "if-then" relation between the variables of Iris dataset can be seen from the below plot.
+
+```{r,echo=F}
+prp(model.rpart)
+```
+
+### 2. k-Nearest Neighbours
+```{r}
+library(class)
+cl = train$Species
+set.seed(1234)
+preds.knn = knn(train[,1:4],test[,1:4],cl,k=3)
+CrossTable(preds.knn,test$Species,chisq = F,prop.r = F,prop.c = F,prop.t = F,prop.chisq = F)
+```
+
+Accuracy of kNN
+```{r}
+((14+17+15)/nrow(test))*100
+```
+
+#### Explaination
+
+kNN can be used for both classification and regression problem. kNN considers the most similar other items defined in terms of their attributes, look at their labels, and give the unassigned item the majority vote. 
+
+By looking at the plots we can clearly see the grouping of species based on their charachterstics such as Sepal.Length, Sepal.Width, etc. When a new data point is introduced, its similarity (using euclidean distance in this case as all variables are continuous) is measured from each of the grouping and species of the test data point is assigned according to the nearest (distance-wise) grouping. Hence, kNN can be easily used for classification of testing data points where we can easily identify the clusters of training data points. Thus, making kNN suitable for Iris dataset.
+
+Below plots show the classification of test data points based on the distance of the test data points from the training groups(clusters).
+
+```{r,echo=F}
+p1 = ggplot(test,aes(x =Sepal.Length,y = Sepal.Width,color = preds.knn)) + geom_point() + ggtitle("Sepal.Width vs Sepal.Length")
+
+p2 = ggplot(test,aes(x =Petal.Length,y = Petal.Width,color = preds.knn)) + geom_point() + ggtitle("Petal.Width vs Petal.Length")
+
+p3 = ggplot(test,aes(x =Petal.Length,y = Sepal.Length,color = preds.knn)) + geom_point() + ggtitle("Sepal.Length vs Petal.Length")
+
+p4 = ggplot(test,aes(x =Petal.Width,y = Sepal.Width,color = preds.knn)) + geom_point()  + ggtitle("Sepal.Width vs Petal.Width")
+
+grid.arrange(p1,p2,p3,p4,nrow=2)
+```
+
+### 3. Support Vector Machine(SVM)
+```{r}
+model.svm = svm(Species ~ . ,data = train)
+preds.svm = predict(model.svm,newdata = test)
+CrossTable(preds.svm,test$Species,chisq = F,prop.r = F,prop.c = F,prop.t = F,prop.chisq = F)
+```
+
+Accuracy of SVM
+```{r}
+((14+16+15)/nrow(test))*100
+```
+
+#### Explaination
+
+Support vector machines (SVMs) are useful when there are very many input variables or when input variables interact with the outcome or with each other in complicated (nonlinear) ways. By observing the plots we can clearly see that some variables are non-linearly related to each other. Hence, using SVM is a good option on the Iris dataset.
+
+Since in SVM we plot each data item as a point in n-dimensional space (where n is number of features you have) with the value of each feature being the value of a particular coordinate and then find a line that splits the data between two differently classified groups of data such that the distances from the closest point in each of the two groups will be farthest away from this line drawn.Since our data is linearly seperable, SVM would be a good choice for classification purpose of Iris dataset.
+
+### 4.Random Forest
+```{r}
+set.seed(100)
+model.rf = randomForest(Species ~ .,data = train)
+preds.rf = predict(model.rf,newdata = test)
+CrossTable(preds.rf,test$Species,chisq = F,prop.r = F,prop.c = F,prop.t = F,prop.chisq = F)
+```
+
+Accuracy of Decision trees
+```{r}
+((14+16+16)/nrow(test))*100
+```
+
+#### Explaination
+
+Random forest is like bootstrapping algorithm with Decision tree (CART) model.Random forest builds multiple CART model with different sample and different initial variables.It repeats the process multiple times and then make final prediction on each observation.Final prediction is function of each prediction.
+
+Random forest can be used in almost all cases and is frequently used to attain higher accuracy of model and to see importance of variables.Importance plot for variables of Iris data is shown below.
+
+```{r,echo = F}
+varImpPlot(model.rf)
+```
+
+Petal.Length is the most important factor in classification of species of the flower.
+
+## Result comparison
+
+We will now the compare the results of different models on iris dataset by looking at the predicted values that differ for each model.
+
+#### Decision Tree vs kNN
+```{r}
+which(preds.rpart != preds.knn)
+```
+
+#### Decision Tree vs SVM
+```{r}
+which(preds.rpart != preds.svm)
+```
+
+#### Decision Tree vs Random Forest
+```{r}
+which(preds.rpart != preds.rf)
+```
+
+Both Random Forest and Decision trees gave us same prediction results.
+
+#### kNN vs SVM
+```{r}
+which(preds.knn != preds.svm)
+```
+
+#### kNN vs Random Forest
+```{r}
+which(preds.knn != preds.rf)
+```
+
+#### SVM vs Random Forest
+```{r}
+which(preds.svm != preds.rf)
+```
+
+Since the 26th and 42nd observation of testing dataset are classified wrongly in most of the cases, we will look at these outliers using the below plots.
+
+```{r,echo=F}
+g1 = ggplot(test,aes(x =Sepal.Length,y = Sepal.Width,color = Species)) + geom_point() + ggtitle("Sepal.Width vs Sepal.Length") + geom_point(data = temp[26,],color = "black",size = 3) + geom_point(data = temp[42,],color = "black",size = 3)
+
+g4 = ggplot(test,aes(x =Petal.Width,y = Sepal.Width,color = Species)) + geom_point()  + ggtitle("Sepal.Width vs Petal.Width") + geom_point(data = temp[26,],color = "black",size = 3) + geom_point(data = temp[42,],color = "black",size = 3)
+
+grid.arrange(g1,g4,nrow = 2)
+```
+
+## Accuracy comparison
+
+Comparison of the accuracy of different models on testing dataset.
+
+```{r}
+models = data.frame(Technique = c("Decision Tree","kNN","SVM","Random Forest"),Accuracy_Percentage = c(92,92,90,92))
+models
+```
+
+SVM performed poorer than other algorithms as the number of observations and variables in our dataset are small. Also not all variables of Iris data are non-linearly dependent.
