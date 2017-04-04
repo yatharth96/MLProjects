@@ -6,3 +6,8 @@ Applied various clustering algorithms in R on Iris dataset and compared the perf
 - k-Nearest Neighbours
 - SVM
 - Random Forest
+
+## Files
+- code.Rmd - Contains the RMarkdown code of the solution.
+- classification.pdf - Output of the code in PDF format
+- Solution can also be found at [RPubs](http://rpubs.com/Yatharth96/265181)
